@@ -1,4 +1,4 @@
--- [ GAMMA SCRIPT ] Animal Hospital Anomaly | РОЗОВАЯ тема + ГРАДИЕНТ (БЕЗ АВТО-ФАРМА)
+-- [ GAMMA SCRIPT ] Animal Hospital Anomaly | РОЗОВАЯ тема + ГРАДИЕНТ (БЕЗ ТЕМ И КОНФИГОВ)
 
 if not game:IsLoaded() then
     game.Loaded:Wait()
@@ -123,7 +123,7 @@ PlayerTab:Toggle({
 PlayerTab:Space()
 
 PlayerTab:Slider({
-    Flag = "SpeedFlag",
+    Flag = "SpeedValueFlag",
     Title = "Speed Hack",
     Desc = "Скорость передвижения",
     IsTooltip = true,
@@ -312,7 +312,7 @@ VisualsTab:Toggle({
 })
 
 -- ============================================================
--- ВКЛАДКА НАСТРОЙКИ
+-- ВКЛАДКА НАСТРОЙКИ (ТОЛЬКО ЗАКРЫТИЕ)
 -- ============================================================
 local SettingsTab = Window:Tab({
     Title = "Настройки",
@@ -342,39 +342,6 @@ SettingsTab:Button({
     Title = "👤 Создатель: Gamma System",
     Justify = "Center",
     Callback = function()
-    end
-})
-
-SettingsTab:Space()
-
-local ConfigManager = Window.ConfigManager
-local myConfig = ConfigManager:CreateConfig("Gamma_Config")
-
-SettingsTab:Button({
-    Title = "💾 Сохранить настройки",
-    Justify = "Center",
-    Callback = function()
-        myConfig:Save()
-        WindUI:Notify({
-            Title = "Gamma",
-            Content = "Настройки сохранены!",
-            Duration = 3
-        })
-    end
-})
-
-SettingsTab:Space()
-
-SettingsTab:Button({
-    Title = "📂 Загрузить настройки",
-    Justify = "Center",
-    Callback = function()
-        myConfig:Load()
-        WindUI:Notify({
-            Title = "Gamma",
-            Content = "Настройки загружены!",
-            Duration = 3
-        })
     end
 })
 
@@ -688,7 +655,6 @@ end
 -- ЗАГРУЗКА
 -- ============================================================
 task.wait(0.5)
-myConfig:Load()
 
 WindUI:Notify({
     Title = "Gamma Script",
