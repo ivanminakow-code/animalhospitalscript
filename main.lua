@@ -1,4 +1,4 @@
--- [ GAMMA SCRIPT ] Animal Hospital Anomaly | ТОЛЬКО ПО АТРИБУТАМ
+-- [ GAMMA SCRIPT ] Animal Hospital Anomaly | РОЗОВАЯ тема + ГРАДИЕНТ (БЕЗ АВТО-ФАРМА)
 
 if not game:IsLoaded() then
     game.Loaded:Wait()
@@ -13,10 +13,22 @@ if not WindUI then
     error("Не удалось загрузить WindUI")
 end
 
+-- ===== РЕГИСТРИРУЕМ РОЗОВУЮ ТЕМУ =====
+WindUI:AddTheme({ 
+    Name = "Pink", 
+    Accent = Color3.fromRGB(255, 80, 200),
+    Dialog = Color3.fromRGB(200, 40, 150),
+    Outline = Color3.fromRGB(255, 180, 230),
+    Text = Color3.fromRGB(255, 255, 255),
+    Placeholder = Color3.fromRGB(255, 160, 220),
+    Background = Color3.fromRGB(60, 10, 50),
+    Button = Color3.fromRGB(230, 60, 180),
+    Icon = Color3.fromRGB(255, 180, 230)
+})
+
 local character = player.Character or player.CharacterAdded:Wait()
 local runService = game:GetService("RunService")
 local userInputService = game:GetService("UserInputService")
-local camera = workspace.CurrentCamera
 local virtualInput = game:GetService("VirtualInputManager")
 
 -- ===== ПЕРЕМЕННЫЕ =====
@@ -28,16 +40,8 @@ local originalWalkspeed = 16
 local infiniteJumpEnabled = false
 local jumpConnection = nil
 
-local thirdPersonEnabled = false
-local thirdPersonDistance = 10
-local thirdPersonConnection = nil
-
 local instantPromptsEnabled = false
 local instantPromptConnections = {}
-
-local autoFarmEnabled = false
-local autoFarmConnection = nil
-local autoFarmDelay = 0.3
 
 local infiniteSanityEnabled = false
 local sanityCheckConnection = nil
@@ -50,17 +54,24 @@ local espHighlights = {}
 local espLabels = {}
 local espUpdateConnection = nil
 
--- ===== ОКНО С КАРТИНКОЙ =====
+-- ===== ОКНО С ГРАДИЕНТОМ =====
 local Window = WindUI:CreateWindow({
     Title = "Animal Hospital Anomaly",
     Author = "Gamma",
     Folder = "Gamma_AnimalHospital",
     Icon = "cat",
     Size = UDim2.fromOffset(600, 550),
-    Theme = "Dark",
     Resizable = true,
-    Background = "rbxassetid://6090344677",
-    BackgroundImageTransparency = 0.3
+    Theme = "Pink",
+    Transparent = true,
+    
+    Background = WindUI:Gradient({
+        ["0"] = { Color = Color3.fromHex("#1a0a2e"), Transparency = 0.3 },
+        ["50"] = { Color = Color3.fromHex("#4a1a6b"), Transparency = 0.3 },
+        ["100"] = { Color = Color3.fromHex("#ff1493"), Transparency = 0.3 }
+    }, {
+        Rotation = 45
+    })
 })
 
 -- ============================================================
@@ -234,7 +245,7 @@ local SanityTab = Window:Tab({
 
 SanityTab:Toggle({
     Title = "Бесконечная Sanity",
-    Desc = "Замораживает Sanity на 100",
+    Desc = "Рассудок становится бесконечным (math.huge)",
     Flag = "InfiniteSanityFlag",
     Value = false,
     Callback = function(state)
@@ -248,13 +259,13 @@ SanityTab:Toggle({
                     if playerStats then
                         local sanity = playerStats:FindFirstChild("Sanity")
                         if sanity then
-                            sanity.Value = 100
+                            sanity.Value = math.huge
                         end
                     end
                     local attributes = player:GetAttributes()
                     for key, value in pairs(attributes) do
                         if string.find(string.lower(key), "sanity") then
-                            player:SetAttribute(key, 100)
+                            player:SetAttribute(key, math.huge)
                         end
                     end
                     character = player.Character or player.CharacterAdded:Wait()
@@ -262,7 +273,7 @@ SanityTab:Toggle({
                     if humanoid then
                         local sanityAttr = humanoid:GetAttribute("Sanity")
                         if sanityAttr then
-                            humanoid:SetAttribute("Sanity", 100)
+                            humanoid:SetAttribute("Sanity", math.huge)
                         end
                     end
                 end
@@ -272,151 +283,6 @@ SanityTab:Toggle({
                 sanityCheckConnection:Disconnect()
                 sanityCheckConnection = nil
             end
-        end
-    end
-})
-
--- ============================================================
--- ВКЛАДКА АВТО
--- ============================================================
-local AutoTab = Window:Tab({
-    Title = "Авто",
-    Icon = "bot",
-    Border = true
-})
-
-AutoTab:Toggle({
-    Title = "Авто-фарм (только к Highlight)",
-    Desc = "Телепортирует к объектам с Highlight",
-    Flag = "AutoFarmFlag",
-    Value = false,
-    Callback = function(state)
-        autoFarmEnabled = state
-        if autoFarmEnabled then
-            if autoFarmConnection then
-                autoFarmConnection:Disconnect()
-            end
-            autoFarmConnection = runService.Heartbeat:Connect(function()
-                if not autoFarmEnabled then
-                    return
-                end
-                if not character or not character.PrimaryPart then
-                    return
-                end
-                local charPos = character.PrimaryPart.Position
-                local highlightedObjects = {}
-                for _, obj in ipairs(workspace:GetDescendants()) do
-                    if obj:IsA("Highlight") and obj.Adornee then
-                        local parent = obj.Adornee
-                        local hasPrompt = false
-                        local prompt = nil
-                        for _, child in ipairs(parent:GetDescendants()) do
-                            if child:IsA("ProximityPrompt") and child.Enabled then
-                                hasPrompt = true
-                                prompt = child
-                                break
-                            end
-                        end
-                        if hasPrompt and prompt then
-                            local part = parent
-                            if part:IsA("BasePart") then
-                                local distance = (charPos - part.Position).Magnitude
-                                table.insert(highlightedObjects, {
-                                    Prompt = prompt,
-                                    Part = part,
-                                    Distance = distance,
-                                    Highlight = obj
-                                })
-                            end
-                        end
-                    end
-                end
-                if #highlightedObjects > 0 then
-                    table.sort(highlightedObjects, function(a, b)
-                        return a.Distance < b.Distance
-                    end)
-                    local target = highlightedObjects[1]
-                    if target.Distance > 3 then
-                        character:SetPrimaryPartCFrame(
-                            CFrame.new(target.Part.Position + Vector3.new(0, 2, 0))
-                        )
-                        task.wait(0.05)
-                    end
-                    virtualInput:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-                    task.wait(0.05)
-                    virtualInput:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-                    target.Prompt:InputHoldBegin()
-                    task.wait(0.05)
-                    target.Prompt:InputHoldEnd()
-                    task.wait(autoFarmDelay)
-                end
-            end)
-        else
-            if autoFarmConnection then
-                autoFarmConnection:Disconnect()
-                autoFarmConnection = nil
-            end
-        end
-    end
-})
-
-AutoTab:Space()
-
-AutoTab:Slider({
-    Flag = "AutoFarmSpeedFlag",
-    Title = "Скорость авто-фарма",
-    Desc = "Задержка между действиями",
-    IsTooltip = true,
-    Step = 0.05,
-    Value = {
-        Min = 0.05,
-        Max = 2,
-        Default = 0.3
-    },
-    Callback = function(value)
-        autoFarmDelay = value
-    end
-})
-
-AutoTab:Space()
-
-AutoTab:Button({
-    Title = "📌 Телепорт к Highlight объекту",
-    Justify = "Center",
-    Callback = function()
-        if not character or not character.PrimaryPart then
-            return
-        end
-        local charPos = character.PrimaryPart.Position
-        local closestHighlighted = nil
-        local closestDistance = math.huge
-        for _, obj in ipairs(workspace:GetDescendants()) do
-            if obj:IsA("Highlight") and obj.Adornee then
-                local parent = obj.Adornee
-                if parent:IsA("BasePart") then
-                    local distance = (charPos - parent.Position).Magnitude
-                    if distance < closestDistance then
-                        closestDistance = distance
-                        closestHighlighted = parent
-                    end
-                end
-            end
-        end
-        if closestHighlighted then
-            character:SetPrimaryPartCFrame(
-                CFrame.new(closestHighlighted.Position + Vector3.new(0, 2, 0))
-            )
-            WindUI:Notify({
-                Title = "Авто-фарм",
-                Content = "Телепорт к Highlight!",
-                Duration = 2
-            })
-        else
-            WindUI:Notify({
-                Title = "Авто-фарм",
-                Content = "Highlight не найдено!",
-                Duration = 2
-            })
         end
     end
 })
@@ -432,7 +298,7 @@ local VisualsTab = Window:Tab({
 
 VisualsTab:Toggle({
     Title = "ESP для пациентов",
-    Desc = "Игроки - белый | Норм - зелёный | Аномалия - красный",
+    Desc = "Показывает имена моделей (маленький шрифт)",
     Flag = "EspFlag",
     Value = false,
     Callback = function(state)
@@ -441,44 +307,6 @@ VisualsTab:Toggle({
             EnableESP()
         else
             DisableESP()
-        end
-    end
-})
-
-VisualsTab:Space()
-
-VisualsTab:Toggle({
-    Title = "Третье лицо (камера)",
-    Desc = "Вид от третьего лица (нажми P)",
-    Flag = "ThirdPersonFlag",
-    Value = false,
-    Callback = function(state)
-        thirdPersonEnabled = state
-        if thirdPersonEnabled then
-            EnableThirdPerson()
-        else
-            DisableThirdPerson()
-        end
-    end
-})
-
-VisualsTab:Space()
-
-VisualsTab:Slider({
-    Flag = "ThirdPersonDistanceFlag",
-    Title = "Дистанция камеры",
-    Desc = "Расстояние камеры",
-    IsTooltip = true,
-    Step = 1,
-    Value = {
-        Min = 5,
-        Max = 30,
-        Default = 10
-    },
-    Callback = function(value)
-        thirdPersonDistance = value
-        if thirdPersonEnabled then
-            UpdateThirdPerson()
         end
     end
 })
@@ -557,10 +385,6 @@ SettingsTab:Button({
     Justify = "Center",
     Callback = function()
         DisableESP()
-        DisableThirdPerson()
-        if autoFarmConnection then
-            autoFarmConnection:Disconnect()
-        end
         if sanityCheckConnection then
             sanityCheckConnection:Disconnect()
         end
@@ -580,7 +404,6 @@ SettingsTab:Button({
         infiniteJumpEnabled = false
         speedEnabled = false
         instantPromptsEnabled = false
-        autoFarmEnabled = false
         infiniteSanityEnabled = false
         character = player.Character or player.CharacterAdded:Wait()
         for _, part in ipairs(character:GetDescendants()) do
@@ -608,10 +431,6 @@ SettingsTab:Button({
     Color = Color3.fromRGB(239, 79, 29),
     Callback = function()
         DisableESP()
-        DisableThirdPerson()
-        if autoFarmConnection then
-            autoFarmConnection:Disconnect()
-        end
         if sanityCheckConnection then
             sanityCheckConnection:Disconnect()
         end
@@ -623,78 +442,6 @@ SettingsTab:Button({
         Window:Destroy()
     end
 })
-
--- ============================================================
--- ФУНКЦИИ ТРЕТЬЕГО ЛИЦА
--- ============================================================
-function EnableThirdPerson()
-    if thirdPersonConnection then
-        thirdPersonConnection:Disconnect()
-    end
-    camera.CameraType = Enum.CameraType.Custom
-    camera.CameraSubject = character
-    thirdPersonConnection = runService.RenderStepped:Connect(function()
-        if not thirdPersonEnabled then
-            return
-        end
-        if not character or not character.PrimaryPart then
-            return
-        end
-        local charPos = character.PrimaryPart.Position
-        local mouse = player:GetMouse()
-        local mousePos = mouse.Hit.Position
-        local lookDir = (mousePos - charPos).Unit
-        if lookDir.Magnitude < 0.1 then
-            lookDir = character.PrimaryPart.CFrame.LookVector
-        end
-        local camPos = charPos - lookDir * thirdPersonDistance
-        camPos = camPos + Vector3.new(0, 2, 0)
-        local raycastParams = RaycastParams.new()
-        raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-        raycastParams.FilterDescendantsInstances = {character}
-        local ray = workspace:Raycast(charPos, (camPos - charPos), raycastParams)
-        if ray then
-            camPos = ray.Position + ray.Normal * 1
-        end
-        camera.CFrame = CFrame.lookAt(camPos, charPos)
-    end)
-end
-
-function DisableThirdPerson()
-    thirdPersonEnabled = false
-    if thirdPersonConnection then
-        thirdPersonConnection:Disconnect()
-        thirdPersonConnection = nil
-    end
-    camera.CameraType = Enum.CameraType.Classic
-end
-
-function UpdateThirdPerson()
-end
-
-userInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then
-        return
-    end
-    if input.KeyCode == Enum.KeyCode.P then
-        thirdPersonEnabled = not thirdPersonEnabled
-        if thirdPersonEnabled then
-            EnableThirdPerson()
-            WindUI:Notify({
-                Title = "Камера",
-                Content = "Третье лицо ВКЛЮЧЕНО",
-                Duration = 2
-            })
-        else
-            DisableThirdPerson()
-            WindUI:Notify({
-                Title = "Камера",
-                Content = "Третье лицо ВЫКЛЮЧЕНО",
-                Duration = 2
-            })
-        end
-    end
-end)
 
 -- ============================================================
 -- ФУНКЦИИ ESP
@@ -721,29 +468,32 @@ function CreateLabel(model, text, color)
     if existing then
         existing:Destroy()
     end
+    
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "GammaLabel"
     billboard.Adornee = model.PrimaryPart
-    billboard.Size = UDim2.new(0, 200, 0, 50)
-    billboard.StudsOffset = Vector3.new(0, 3.5, 0)
+    billboard.Size = UDim2.new(0, 100, 0, 25)
+    billboard.StudsOffset = Vector3.new(0, 3, 0)
     billboard.AlwaysOnTop = true
     billboard.Parent = model
+    
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, 0, 1, 0)
-    label.BackgroundTransparency = 0.5
+    label.BackgroundTransparency = 0.4
     label.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
     label.Text = text
     label.TextColor3 = color
     label.TextScaled = true
-    label.Font = Enum.Font.GothamBold
-    label.TextStrokeTransparency = 0
+    label.TextSize = 14
+    label.Font = Enum.Font.GothamMedium
+    label.TextStrokeTransparency = 0.2
     label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
     label.Parent = billboard
+    
     table.insert(espLabels, billboard)
     return billboard
 end
 
--- ФУНКЦИЯ ОПРЕДЕЛЕНИЯ АНОМАЛИЙ (ТОЛЬКО ПО АТРИБУТАМ)
 function IsAnomaly(model)
     if not model or not model.PrimaryPart then
         return false
@@ -753,7 +503,6 @@ function IsAnomaly(model)
         return false
     end
     
-    -- Проверяем ТОЛЬКО атрибуты
     local attributes = model:GetAttributes()
     for key, value in pairs(attributes) do
         local lowerKey = string.lower(key)
@@ -807,46 +556,35 @@ function CreateESP(model)
     end
     RemoveBuiltInHighlights(model)
     local isPlayer = IsPlayer(model)
+    local isAnomaly = IsAnomaly(model)
+    
+    local color = Color3.fromRGB(0, 255, 0)
+    local labelText = model.Name or "Unknown"
+    
     if isPlayer then
-        local highlight = Instance.new("Highlight")
-        highlight.Name = "GammaESP"
-        highlight.Adornee = model
-        highlight.FillColor = Color3.fromRGB(255, 255, 255)
-        highlight.OutlineColor = Color3.fromRGB(200, 200, 200)
-        highlight.FillTransparency = 0.3
-        highlight.OutlineTransparency = 0.2
-        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        highlight.Parent = model
-        table.insert(espHighlights, highlight)
-        CreateLabel(model, "ИГРОК", Color3.fromRGB(255, 255, 255))
+        color = Color3.fromRGB(255, 255, 255)
+        labelText = model.Name or "Player"
+    elseif isAnomaly then
+        color = Color3.fromRGB(255, 0, 0)
+        labelText = model.Name or "Anomaly"
     else
-        local isAnomaly = IsAnomaly(model)
-        if isAnomaly then
-            local highlight = Instance.new("Highlight")
-            highlight.Name = "GammaESP"
-            highlight.Adornee = model
-            highlight.FillColor = Color3.fromRGB(255, 0, 0)
-            highlight.OutlineColor = Color3.fromRGB(255, 200, 200)
-            highlight.FillTransparency = 0.3
-            highlight.OutlineTransparency = 0.2
-            highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-            highlight.Parent = model
-            table.insert(espHighlights, highlight)
-            CreateLabel(model, "АНОМАЛИЯ", Color3.fromRGB(255, 0, 0))
-        else
-            local highlight = Instance.new("Highlight")
-            highlight.Name = "GammaESP"
-            highlight.Adornee = model
-            highlight.FillColor = Color3.fromRGB(0, 255, 0)
-            highlight.OutlineColor = Color3.fromRGB(200, 255, 200)
-            highlight.FillTransparency = 0.3
-            highlight.OutlineTransparency = 0.2
-            highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-            highlight.Parent = model
-            table.insert(espHighlights, highlight)
-            CreateLabel(model, "НОРМ", Color3.fromRGB(0, 255, 0))
-        end
+        color = Color3.fromRGB(0, 255, 0)
+        labelText = model.Name or "Normal"
     end
+    
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "GammaESP"
+    highlight.Adornee = model
+    highlight.FillColor = color
+    highlight.OutlineColor = color
+    highlight.FillTransparency = 0.3
+    highlight.OutlineTransparency = 0.2
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.Parent = model
+    table.insert(espHighlights, highlight)
+    
+    CreateLabel(model, labelText, color)
+    
     return highlight
 end
 
@@ -954,8 +692,8 @@ myConfig:Load()
 
 WindUI:Notify({
     Title = "Gamma Script",
-    Content = "Animal Hospital загружен! ESP по атрибутам!",
+    Content = "Animal Hospital загружен! Розовый градиент! 💗",
     Duration = 4
 })
 
-print("Gamma Script запущен! 🚀")
+print("Gamma Script запущен! 💗")
