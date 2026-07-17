@@ -1,4 +1,4 @@
--- [ GAMMA SCRIPT ] Animal Hospital Anomaly | GUI поверх всех окон + OpenButton
+-- [ MAZAMI HUB ] Animal Hospital Anomaly | СИНЯЯ тема + GUI поверх всех окон
 
 if not game:IsLoaded() then
     game.Loaded:Wait()
@@ -13,17 +13,17 @@ if not WindUI then
     error("Не удалось загрузить WindUI")
 end
 
--- ===== РЕГИСТРИРУЕМ РОЗОВУЮ ТЕМУ =====
+-- ===== РЕГИСТРИРУЕМ СИНЮЮ ТЕМУ =====
 WindUI:AddTheme({ 
-    Name = "Pink", 
-    Accent = Color3.fromRGB(255, 80, 200),
-    Dialog = Color3.fromRGB(200, 40, 150),
-    Outline = Color3.fromRGB(255, 180, 230),
+    Name = "Blue", 
+    Accent = Color3.fromRGB(30, 144, 255),
+    Dialog = Color3.fromRGB(0, 70, 180),
+    Outline = Color3.fromRGB(100, 180, 255),
     Text = Color3.fromRGB(255, 255, 255),
-    Placeholder = Color3.fromRGB(255, 160, 220),
-    Background = Color3.fromRGB(60, 10, 50),
-    Button = Color3.fromRGB(230, 60, 180),
-    Icon = Color3.fromRGB(255, 180, 230)
+    Placeholder = Color3.fromRGB(150, 200, 255),
+    Background = Color3.fromRGB(10, 30, 70),
+    Button = Color3.fromRGB(0, 100, 220),
+    Icon = Color3.fromRGB(100, 180, 255)
 })
 
 local character = player.Character or player.CharacterAdded:Wait()
@@ -49,42 +49,128 @@ local espHighlights = {}
 local espLabels = {}
 local espUpdateConnection = nil
 
+-- ===== ОПРЕДЕЛЯЕМ ЭКЗЕКЬЮТОР =====
+local executorName = "Unknown"
+local executorStatus = "❗ НЕ ПРОВЕРЕННО"
+local isSupported = false
+
+-- Список поддерживаемых экзекьюторов
+local supportedExecutors = {
+    "Solara",
+    "Delta", 
+    "Xeno",
+    "Eclipse",
+    "Madium"
+}
+
+-- Пытаемся определить экзекьютор через стандартные функции
+local function getExecutorName()
+    local name = ""
+    local success, result = pcall(function()
+        if identifyexecutor then
+            name = identifyexecutor()
+        elseif getexecutorname then
+            name = getexecutorname()
+        elseif syn and syn.version then
+            name = "Synapse X"
+        elseif isfolder and isfile then
+            name = "ScriptWare"
+        elseif isexecutorenv and isexecutorenv() then
+            name = "KRNL"
+        end
+        return name
+    end)
+    
+    if success and result and result ~= "" then
+        return result
+    end
+    return "Unknown"
+end
+
+executorName = getExecutorName()
+
+-- Проверяем, поддерживается ли экзекьютор
+for _, exec in ipairs(supportedExecutors) do
+    if string.find(string.lower(executorName), string.lower(exec)) then
+        isSupported = true
+        executorStatus = "✅ ПОДДЕРЖИВАЕТСЯ"
+        break
+    end
+end
+
+-- Если не нашли в списке - помечаем как непроверенный
+if not isSupported then
+    executorStatus = "❗ НЕ ПРОВЕРЕННО"
+end
+
 -- ===== ОКНО С КНОПКОЙ ДЛЯ ОТКРЫТИЯ =====
 local Window = WindUI:CreateWindow({
-    Title = "Animal Hospital Anomaly",
-    Author = "Gamma System",
-    Folder = "Gamma_AnimalHospital",
+    Title = "Mazami Hub",
+    Author = "ivanmartiz2013",
+    Folder = "Mazami_Hub",
     Icon = "cat",
     Size = UDim2.fromOffset(600, 550),
     Resizable = true,
-    Theme = "Pink",
+    Theme = "Blue",
     Transparent = true,
-    AlwaysOnTop = true,  -- GUI поверх всех окон
-    ToggleKey = Enum.KeyCode.RightShift,  -- можно открывать/закрывать через RightShift
+    AlwaysOnTop = true,
+    ToggleKey = Enum.KeyCode.RightShift,
     
-    -- ===== КНОПКА ДЛЯ ОТКРЫТИЯ GUI =====
     OpenButton = {
-        Title = "🐾 Gamma Script",  -- название на кнопке
-        Icon = "cat",  -- иконка
-        Enabled = true,  -- включена
-        Draggable = true,  -- можно перетаскивать
-        Scale = 0.6,  -- размер кнопки
-        OnlyMobile = false,  -- работает и на ПК
-        Color = ColorSequence.new(  -- градиент
-            Color3.fromHex("#FF1493"),  -- ярко-розовый
-            Color3.fromHex("#8A2BE2")   -- фиолетовый
+        Title = "🔵 Mazami Hub",
+        Icon = "cat",
+        Enabled = true,
+        Draggable = true,
+        Scale = 0.6,
+        OnlyMobile = false,
+        Color = ColorSequence.new(
+            Color3.fromHex("#1E90FF"),
+            Color3.fromHex("#0066CC")
         ),
-        CornerRadius = UDim.new(0, 12),  -- скруглённые углы
-        StrokeThickness = 2,  -- обводка
+        CornerRadius = UDim.new(0, 12),
+        StrokeThickness = 2,
     },
     
     Background = WindUI:Gradient({
-        ["0"] = { Color = Color3.fromHex("#1a0a2e"), Transparency = 0.3 },
-        ["50"] = { Color = Color3.fromHex("#4a1a6b"), Transparency = 0.3 },
-        ["100"] = { Color = Color3.fromHex("#ff1493"), Transparency = 0.3 }
+        ["0"] = { Color = Color3.fromHex("#0a1628"), Transparency = 0.3 },
+        ["50"] = { Color = Color3.fromHex("#1a3a6b"), Transparency = 0.3 },
+        ["100"] = { Color = Color3.fromHex("#1E90FF"), Transparency = 0.3 }
     }, {
         Rotation = 45
     })
+})
+
+-- ===== ТЭГ С ВЕРСИЕЙ (1.0) =====
+Window:Tag({
+    Title = "v1.0",
+    Icon = "code",
+    Color = Color3.fromHex("#1E90FF"),
+    Border = true
+})
+
+-- ============================================================
+-- ВКЛАДКА ГЛАВНАЯ (ОТКРЫВАЕТСЯ ПО УМОЛЧАНИЮ)
+-- ============================================================
+local MainTab = Window:Tab({
+    Title = "Главная",
+    Icon = "house",
+    Border = true
+})
+
+MainTab:Button({
+    Title = "📌 Экзекьютор: " .. executorName,
+    Justify = "Center",
+    Callback = function()
+    end
+})
+
+MainTab:Space()
+
+MainTab:Button({
+    Title = executorStatus,
+    Justify = "Center",
+    Callback = function()
+    end
 })
 
 -- ============================================================
@@ -272,7 +358,7 @@ VisualsTab:Toggle({
 })
 
 -- ============================================================
--- ВКЛАДКА НАСТРОЙКИ
+-- ВКЛАДКА НАСТРОЙКИ (ТОЛЬКО ПРОЗРАЧНОСТЬ)
 -- ============================================================
 local SettingsTab = Window:Tab({
     Title = "Настройки",
@@ -280,86 +366,23 @@ local SettingsTab = Window:Tab({
     Border = true
 })
 
-SettingsTab:Button({
-    Title = "🔧 Скрипт: Animal Hospital Anomaly",
-    Justify = "Center",
-    Callback = function()
-    end
-})
-
-SettingsTab:Space()
-
-SettingsTab:Button({
-    Title = "📌 Экзекьютор: Full Support",
-    Justify = "Center",
-    Callback = function()
-    end
-})
-
-SettingsTab:Space()
-
-SettingsTab:Button({
-    Title = "👤 Создатель: Gamma System",
-    Justify = "Center",
-    Callback = function()
-    end
-})
-
-SettingsTab:Space()
-
-SettingsTab:Button({
-    Title = "🔄 Перезагрузить скрипт",
-    Justify = "Center",
-    Callback = function()
-        DisableESP()
-        for _, conn in ipairs(instantPromptConnections) do
-            if conn then
-                conn:Disconnect()
-            end
+SettingsTab:Slider({
+    Flag = "TransparencyFlag",
+    Title = "Прозрачность GUI",
+    Desc = "Регулировка прозрачности окна",
+    IsTooltip = true,
+    Step = 0.05,
+    Value = {
+        Min = 0,
+        Max = 1,
+        Default = 0
+    },
+    Callback = function(value)
+        Window:SetBackgroundTransparency(value)
+        local frame = Window.Frame
+        if frame then
+            frame.BackgroundTransparency = value
         end
-        instantPromptConnections = {}
-        if noclipConnection then
-            noclipConnection:Disconnect()
-        end
-        if jumpConnection then
-            jumpConnection:Disconnect()
-        end
-        noclipEnabled = false
-        infiniteJumpEnabled = false
-        speedEnabled = false
-        instantPromptsEnabled = false
-        character = player.Character or player.CharacterAdded:Wait()
-        for _, part in ipairs(character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = true
-            end
-        end
-        local humanoid = character:FindFirstChild("Humanoid")
-        if humanoid then
-            humanoid.WalkSpeed = 16
-        end
-        WindUI:Notify({
-            Title = "Gamma",
-            Content = "Перезагружено!",
-            Duration = 3
-        })
-    end
-})
-
-SettingsTab:Space()
-
-SettingsTab:Button({
-    Title = "❌ Закрыть меню",
-    Justify = "Center",
-    Color = Color3.fromRGB(239, 79, 29),
-    Callback = function()
-        DisableESP()
-        for _, conn in ipairs(instantPromptConnections) do
-            if conn then
-                conn:Disconnect()
-            end
-        end
-        Window:Destroy()
     end
 })
 
@@ -610,9 +633,9 @@ end
 task.wait(0.5)
 
 WindUI:Notify({
-    Title = "Gamma Script",
-    Content = "Animal Hospital загружен! 💗",
+    Title = "Mazami Hub",
+    Content = "Animal Hospital загружен! Синяя тема 💙",
     Duration = 4
 })
 
-print("Gamma Script запущен!")
+print("Mazami Hub запущен! Исполнитель: " .. executorName)
