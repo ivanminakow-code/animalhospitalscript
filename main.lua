@@ -1,4 +1,4 @@
--- [ GAMMA SCRIPT ] Animal Hospital Anomaly | РОЗОВАЯ тема + ГРАДИЕНТ (БЕЗ ТЕМ И КОНФИГОВ)
+-- [ GAMMA SCRIPT ] Animal Hospital Anomaly | GUI поверх всех окон + OpenButton
 
 if not game:IsLoaded() then
     game.Loaded:Wait()
@@ -43,27 +43,40 @@ local jumpConnection = nil
 local instantPromptsEnabled = false
 local instantPromptConnections = {}
 
-local infiniteSanityEnabled = false
-local sanityCheckConnection = nil
-local playerStats = player:FindFirstChild("leaderstats")
-
--- ===== ESP ПЕРЕМЕННЫЕ =====
 local espEnabled = false
 local espConnections = {}
 local espHighlights = {}
 local espLabels = {}
 local espUpdateConnection = nil
 
--- ===== ОКНО С ГРАДИЕНТОМ =====
+-- ===== ОКНО С КНОПКОЙ ДЛЯ ОТКРЫТИЯ =====
 local Window = WindUI:CreateWindow({
     Title = "Animal Hospital Anomaly",
-    Author = "Gamma",
+    Author = "Gamma System",
     Folder = "Gamma_AnimalHospital",
     Icon = "cat",
     Size = UDim2.fromOffset(600, 550),
     Resizable = true,
     Theme = "Pink",
     Transparent = true,
+    AlwaysOnTop = true,  -- GUI поверх всех окон
+    ToggleKey = Enum.KeyCode.RightShift,  -- можно открывать/закрывать через RightShift
+    
+    -- ===== КНОПКА ДЛЯ ОТКРЫТИЯ GUI =====
+    OpenButton = {
+        Title = "🐾 Gamma Script",  -- название на кнопке
+        Icon = "cat",  -- иконка
+        Enabled = true,  -- включена
+        Draggable = true,  -- можно перетаскивать
+        Scale = 0.6,  -- размер кнопки
+        OnlyMobile = false,  -- работает и на ПК
+        Color = ColorSequence.new(  -- градиент
+            Color3.fromHex("#FF1493"),  -- ярко-розовый
+            Color3.fromHex("#8A2BE2")   -- фиолетовый
+        ),
+        CornerRadius = UDim.new(0, 12),  -- скруглённые углы
+        StrokeThickness = 2,  -- обводка
+    },
     
     Background = WindUI:Gradient({
         ["0"] = { Color = Color3.fromHex("#1a0a2e"), Transparency = 0.3 },
@@ -235,59 +248,6 @@ PlayerTab:Toggle({
 })
 
 -- ============================================================
--- ВКЛАДКА SANITY
--- ============================================================
-local SanityTab = Window:Tab({
-    Title = "Sanity",
-    Icon = "heart",
-    Border = true
-})
-
-SanityTab:Toggle({
-    Title = "Бесконечная Sanity",
-    Desc = "Рассудок становится бесконечным (math.huge)",
-    Flag = "InfiniteSanityFlag",
-    Value = false,
-    Callback = function(state)
-        infiniteSanityEnabled = state
-        if infiniteSanityEnabled then
-            if sanityCheckConnection then
-                sanityCheckConnection:Disconnect()
-            end
-            sanityCheckConnection = runService.Heartbeat:Connect(function()
-                if infiniteSanityEnabled then
-                    if playerStats then
-                        local sanity = playerStats:FindFirstChild("Sanity")
-                        if sanity then
-                            sanity.Value = math.huge
-                        end
-                    end
-                    local attributes = player:GetAttributes()
-                    for key, value in pairs(attributes) do
-                        if string.find(string.lower(key), "sanity") then
-                            player:SetAttribute(key, math.huge)
-                        end
-                    end
-                    character = player.Character or player.CharacterAdded:Wait()
-                    local humanoid = character:FindFirstChild("Humanoid")
-                    if humanoid then
-                        local sanityAttr = humanoid:GetAttribute("Sanity")
-                        if sanityAttr then
-                            humanoid:SetAttribute("Sanity", math.huge)
-                        end
-                    end
-                end
-            end)
-        else
-            if sanityCheckConnection then
-                sanityCheckConnection:Disconnect()
-                sanityCheckConnection = nil
-            end
-        end
-    end
-})
-
--- ============================================================
 -- ВКЛАДКА VISUALS
 -- ============================================================
 local VisualsTab = Window:Tab({
@@ -312,7 +272,7 @@ VisualsTab:Toggle({
 })
 
 -- ============================================================
--- ВКЛАДКА НАСТРОЙКИ (ТОЛЬКО ЗАКРЫТИЕ)
+-- ВКЛАДКА НАСТРОЙКИ
 -- ============================================================
 local SettingsTab = Window:Tab({
     Title = "Настройки",
@@ -352,9 +312,6 @@ SettingsTab:Button({
     Justify = "Center",
     Callback = function()
         DisableESP()
-        if sanityCheckConnection then
-            sanityCheckConnection:Disconnect()
-        end
         for _, conn in ipairs(instantPromptConnections) do
             if conn then
                 conn:Disconnect()
@@ -371,7 +328,6 @@ SettingsTab:Button({
         infiniteJumpEnabled = false
         speedEnabled = false
         instantPromptsEnabled = false
-        infiniteSanityEnabled = false
         character = player.Character or player.CharacterAdded:Wait()
         for _, part in ipairs(character:GetDescendants()) do
             if part:IsA("BasePart") then
@@ -398,9 +354,6 @@ SettingsTab:Button({
     Color = Color3.fromRGB(239, 79, 29),
     Callback = function()
         DisableESP()
-        if sanityCheckConnection then
-            sanityCheckConnection:Disconnect()
-        end
         for _, conn in ipairs(instantPromptConnections) do
             if conn then
                 conn:Disconnect()
@@ -658,8 +611,8 @@ task.wait(0.5)
 
 WindUI:Notify({
     Title = "Gamma Script",
-    Content = "Animal Hospital загружен! Розовый градиент! 💗",
+    Content = "Animal Hospital загружен! 💗",
     Duration = 4
 })
 
-print("Gamma Script запущен! 💗")
+print("Gamma Script запущен!")
