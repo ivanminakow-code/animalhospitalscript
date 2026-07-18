@@ -49,12 +49,19 @@ local espHighlights = {}
 local espLabels = {}
 local espUpdateConnection = nil
 
+-- ===== ПЕРЕМЕННЫЕ ДЛЯ АВТО DNA =====
+local autoDNAEnabled = false
+local autoDNAConnection = nil
+local autoDNADelay = 0.5
+
+-- ===== ПЕРЕМЕННЫЕ ДЛЯ МОНИТОРИНГА =====
+local readyNotified = {}
+
 -- ===== ОПРЕДЕЛЯЕМ ЭКЗЕКЬЮТОР =====
 local executorName = "Unknown"
 local executorStatus = "❗ НЕ ПРОВЕРЕННО"
 local isSupported = false
 
--- Список поддерживаемых экзекьюторов
 local supportedExecutors = {
     "Solara",
     "Delta", 
@@ -63,7 +70,6 @@ local supportedExecutors = {
     "Madium"
 }
 
--- Пытаемся определить экзекьютор через стандартные функции
 local function getExecutorName()
     local name = ""
     local success, result = pcall(function()
@@ -89,7 +95,6 @@ end
 
 executorName = getExecutorName()
 
--- Проверяем, поддерживается ли экзекьютор
 for _, exec in ipairs(supportedExecutors) do
     if string.find(string.lower(executorName), string.lower(exec)) then
         isSupported = true
@@ -98,7 +103,6 @@ for _, exec in ipairs(supportedExecutors) do
     end
 end
 
--- Если не нашли в списке - помечаем как непроверенный
 if not isSupported then
     executorStatus = "❗ НЕ ПРОВЕРЕННО"
 end
@@ -149,7 +153,7 @@ Window:Tag({
 })
 
 -- ============================================================
--- ВКЛАДКА ГЛАВНАЯ (ОТКРЫВАЕТСЯ ПО УМОЛЧАНИЮ)
+-- ВКЛАДКА ГЛАВНАЯ
 -- ============================================================
 local MainTab = Window:Tab({
     Title = "Главная",
@@ -334,6 +338,172 @@ PlayerTab:Toggle({
 })
 
 -- ============================================================
+-- ВКЛАДКА АВТО
+-- ============================================================
+local AutoTab = Window:Tab({
+    Title = "Авто",
+    Icon = "bot",
+    Border = true
+})
+
+AutoTab:Toggle({
+    Title = "Авто взять DNA",
+    Desc = "Телепортирует к ProximityPrompt с действием 'Take DNA Sample' и нажимает E",
+    Flag = "AutoDNAFlag",
+    Value = false,
+    Callback = function(state)
+        autoDNAEnabled = state
+        if autoDNAEnabled then
+            if autoDNAConnection then
+                autoDNAConnection:Disconnect()
+            end
+            autoDNAConnection = runService.Heartbeat:Connect(function()
+                if not autoDNAEnabled then
+                    return
+                end
+                if not character or not character.PrimaryPart then
+                    return
+                end
+                
+                local charPos = character.PrimaryPart.Position
+                local dnaPrompts = {}
+                
+                for _, obj in ipairs(workspace:GetDescendants()) do
+                    if obj:IsA("ProximityPrompt") and obj.Enabled then
+                        local actionText = obj.ActionText or ""
+                        local objectText = obj.ObjectText or ""
+                        
+                        local actionUpper = string.upper(actionText)
+                        local objectUpper = string.upper(objectText)
+                        
+                        -- Проверяем наличие "DNA" в любом тексте
+                        if string.find(objectUpper, "DNA") or 
+                           string.find(actionUpper, "DNA") or
+                           string.find(actionUpper, "TAKE DNA") then
+                            
+                            local parent = obj.Parent
+                            if parent and parent:IsA("BasePart") then
+                                local distance = (charPos - parent.Position).Magnitude
+                                table.insert(dnaPrompts, {
+                                    Prompt = obj,
+                                    Part = parent,
+                                    Distance = distance
+                                })
+                            end
+                        end
+                    end
+                end
+                
+                if #dnaPrompts > 0 then
+                    table.sort(dnaPrompts, function(a, b)
+                        return a.Distance < b.Distance
+                    end)
+                    
+                    local target = dnaPrompts[1]
+                    
+                    if target.Distance > 3 then
+                        character:SetPrimaryPartCFrame(
+                            CFrame.new(target.Part.Position + Vector3.new(0, 2, 0))
+                        )
+                        task.wait(0.05)
+                    end
+                    
+                    virtualInput:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                    task.wait(0.05)
+                    virtualInput:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                    
+                    target.Prompt:InputHoldBegin()
+                    task.wait(0.05)
+                    target.Prompt:InputHoldEnd()
+                    
+                    task.wait(autoDNADelay)
+                end
+            end)
+        else
+            if autoDNAConnection then
+                autoDNAConnection:Disconnect()
+                autoDNAConnection = nil
+            end
+        end
+    end
+})
+
+AutoTab:Space()
+
+AutoTab:Slider({
+    Flag = "AutoDNADelayFlag",
+    Title = "Задержка авто DNA",
+    Desc = "Время между действиями (сек)",
+    IsTooltip = true,
+    Step = 0.1,
+    Value = {
+        Min = 0.1,
+        Max = 3,
+        Default = 0.5
+    },
+    Callback = function(value)
+        autoDNADelay = value
+    end
+})
+
+AutoTab:Space()
+
+AutoTab:Button({
+    Title = "📌 Телепорт к DNA",
+    Justify = "Center",
+    Callback = function()
+        if not character or not character.PrimaryPart then
+            return
+        end
+        
+        local charPos = character.PrimaryPart.Position
+        local closestPrompt = nil
+        local closestDistance = math.huge
+        
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("ProximityPrompt") and obj.Enabled then
+                local actionText = obj.ActionText or ""
+                local objectText = obj.ObjectText or ""
+                
+                local actionUpper = string.upper(actionText)
+                local objectUpper = string.upper(objectText)
+                
+                if string.find(objectUpper, "DNA") or 
+                   string.find(actionUpper, "DNA") or
+                   string.find(actionUpper, "TAKE DNA") then
+                    
+                    local parent = obj.Parent
+                    if parent and parent:IsA("BasePart") then
+                        local distance = (charPos - parent.Position).Magnitude
+                        if distance < closestDistance then
+                            closestDistance = distance
+                            closestPrompt = parent
+                        end
+                    end
+                end
+            end
+        end
+        
+        if closestPrompt then
+            character:SetPrimaryPartCFrame(
+                CFrame.new(closestPrompt.Position + Vector3.new(0, 2, 0))
+            )
+            WindUI:Notify({
+                Title = "Авто DNA",
+                Content = "Телепорт к DNA!",
+                Duration = 2
+            })
+        else
+            WindUI:Notify({
+                Title = "Авто DNA",
+                Content = "DNA не найдено!",
+                Duration = 2
+            })
+        end
+    end
+})
+
+-- ============================================================
 -- ВКЛАДКА VISUALS
 -- ============================================================
 local VisualsTab = Window:Tab({
@@ -344,7 +514,7 @@ local VisualsTab = Window:Tab({
 
 VisualsTab:Toggle({
     Title = "ESP для пациентов",
-    Desc = "Показывает имена моделей (маленький шрифт)",
+    Desc = "Показывает имена моделей (маленький шрифт). Barney - коричневый ☕",
     Flag = "EspFlag",
     Value = false,
     Callback = function(state)
@@ -358,7 +528,7 @@ VisualsTab:Toggle({
 })
 
 -- ============================================================
--- ВКЛАДКА НАСТРОЙКИ (ТОЛЬКО ПРОЗРАЧНОСТЬ)
+-- ВКЛАДКА НАСТРОЙКИ
 -- ============================================================
 local SettingsTab = Window:Tab({
     Title = "Настройки",
@@ -385,6 +555,42 @@ SettingsTab:Slider({
         end
     end
 })
+
+-- ============================================================
+-- МОНИТОРИНГ НАДПИСИ "READY" (ВСЕГДА ВКЛЮЧЁН)
+-- ============================================================
+task.spawn(function()
+    while task.wait(1) do
+        pcall(function()
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                if obj:IsA("TextLabel") or obj:IsA("TextButton") then
+                    local text = obj.Text or ""
+                    local upperText = string.upper(text)
+                    
+                    if string.find(upperText, "READY") then
+                        local objId = tostring(obj)
+                        
+                        if not readyNotified[objId] then
+                            readyNotified[objId] = true
+                            
+                            WindUI:Notify({
+                                Title = "☕ КОФЕ ГОТОВО!",
+                                Content = "Забери кофе, пока не остыл!",
+                                Duration = 5,
+                                Icon = "coffee"
+                            })
+                            
+                            print("[Mazami Hub] Кофе готов! Найдена надпись: " .. text)
+                            
+                            task.wait(30)
+                            readyNotified[objId] = nil
+                        end
+                    end
+                end
+            end
+        end)
+    end
+end)
 
 -- ============================================================
 -- ФУНКЦИИ ESP
@@ -415,21 +621,21 @@ function CreateLabel(model, text, color)
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "GammaLabel"
     billboard.Adornee = model.PrimaryPart
-    billboard.Size = UDim2.new(0, 100, 0, 25)
-    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.Size = UDim2.new(0, 150, 0, 30)
+    billboard.StudsOffset = Vector3.new(0, 3.5, 0)
     billboard.AlwaysOnTop = true
     billboard.Parent = model
     
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, 0, 1, 0)
-    label.BackgroundTransparency = 0.4
+    label.BackgroundTransparency = 0.5
     label.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
     label.Text = text
     label.TextColor3 = color
     label.TextScaled = true
     label.TextSize = 14
-    label.Font = Enum.Font.GothamMedium
-    label.TextStrokeTransparency = 0.2
+    label.Font = Enum.Font.GothamBold
+    label.TextStrokeTransparency = 0
     label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
     label.Parent = billboard
     
@@ -493,6 +699,16 @@ function IsPlayer(model)
     return false
 end
 
+function IsBarney(model)
+    if not model or not model.Name then
+        return false
+    end
+    if string.find(string.upper(model.Name), "BARNEY") then
+        return true
+    end
+    return false
+end
+
 function CreateESP(model)
     if not model or not model.PrimaryPart then
         return nil
@@ -500,11 +716,15 @@ function CreateESP(model)
     RemoveBuiltInHighlights(model)
     local isPlayer = IsPlayer(model)
     local isAnomaly = IsAnomaly(model)
+    local isBarney = IsBarney(model)
     
     local color = Color3.fromRGB(0, 255, 0)
     local labelText = model.Name or "Unknown"
     
-    if isPlayer then
+    if isBarney then
+        color = Color3.fromRGB(139, 69, 19)
+        labelText = "☕ БАРНИ"  -- Убрал медведя
+    elseif isPlayer then
         color = Color3.fromRGB(255, 255, 255)
         labelText = model.Name or "Player"
     elseif isAnomaly then
