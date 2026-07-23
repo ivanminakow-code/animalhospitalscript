@@ -1,19 +1,20 @@
--- [ MAZAMI HUB ] Animal Hospital Anomaly | СИНЯЯ тема + GUI поверх всех окон
+-- [ MAZAMI HUB ] Animal Hospital Anomaly | BLUE THEME + GUI ON TOP OF ALL WINDOWS
 
 if not game:IsLoaded() then
     game.Loaded:Wait()
 end
 
 local player = game.Players.LocalPlayer
+local camera = workspace.CurrentCamera
 player.CameraMaxZoomDistance = 99999
 player.CameraMode = Enum.CameraMode.Classic
 
 local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
 if not WindUI then
-    error("Не удалось загрузить WindUI")
+    error("Failed to load WindUI")
 end
 
--- ===== РЕГИСТРИРУЕМ СИНЮЮ ТЕМУ =====
+-- ===== REGISTER BLUE THEME =====
 WindUI:AddTheme({ 
     Name = "Blue", 
     Accent = Color3.fromRGB(30, 144, 255),
@@ -31,7 +32,7 @@ local runService = game:GetService("RunService")
 local userInputService = game:GetService("UserInputService")
 local virtualInput = game:GetService("VirtualInputManager")
 
--- ===== ПЕРЕМЕННЫЕ =====
+-- ===== VARIABLES =====
 local noclipEnabled = false
 local noclipConnection = nil
 local speedEnabled = false
@@ -42,6 +43,7 @@ local jumpConnection = nil
 
 local instantPromptsEnabled = false
 local instantPromptConnections = {}
+local instantPromptLoopConnection = nil
 
 local espEnabled = false
 local espConnections = {}
@@ -49,17 +51,31 @@ local espHighlights = {}
 local espLabels = {}
 local espUpdateConnection = nil
 
--- ===== ПЕРЕМЕННЫЕ ДЛЯ АВТО DNA =====
+-- ===== TRACERS VARIABLES =====
+local tracersEnabled = false
+local tracersConnection = nil
+local tracersObjects = {}
+
+-- ===== AUTO VARIABLES =====
 local autoDNAEnabled = false
 local autoDNAConnection = nil
 local autoDNADelay = 0.5
 
--- ===== ПЕРЕМЕННЫЕ ДЛЯ МОНИТОРИНГА =====
-local readyNotified = {}
+local autoCoffeeEnabled = false
+local autoCoffeeConnection = nil
+local autoCoffeeDelay = 0.5
 
--- ===== ОПРЕДЕЛЯЕМ ЭКЗЕКЬЮТОР =====
+local autoTaserEnabled = false
+local autoTaserConnection = nil
+local autoTaserDelay = 0.5
+
+-- ===== MONITORING VARIABLES =====
+local readyNotified = {}
+local taserNotified = {}
+
+-- ===== DETECT EXECUTOR =====
 local executorName = "Unknown"
-local executorStatus = "❗ НЕ ПРОВЕРЕННО"
+local executorStatus = "❗ NOT VERIFIED"
 local isSupported = false
 
 local supportedExecutors = {
@@ -98,22 +114,22 @@ executorName = getExecutorName()
 for _, exec in ipairs(supportedExecutors) do
     if string.find(string.lower(executorName), string.lower(exec)) then
         isSupported = true
-        executorStatus = "✅ ПОДДЕРЖИВАЕТСЯ"
+        executorStatus = "✅ SUPPORTED"
         break
     end
 end
 
 if not isSupported then
-    executorStatus = "❗ НЕ ПРОВЕРЕННО"
+    executorStatus = "❗ NOT VERIFIED"
 end
 
--- ===== ОКНО С КНОПКОЙ ДЛЯ ОТКРЫТИЯ =====
+-- ===== WINDOW WITH OPEN BUTTON =====
 local Window = WindUI:CreateWindow({
     Title = "Mazami Hub",
     Author = "ivanmartiz2013",
     Folder = "Mazami_Hub",
     Icon = "cat",
-    Size = UDim2.fromOffset(600, 550),
+    Size = UDim2.fromOffset(650, 600),
     Resizable = true,
     Theme = "Blue",
     Transparent = true,
@@ -144,7 +160,7 @@ local Window = WindUI:CreateWindow({
     })
 })
 
--- ===== ТЭГ С ВЕРСИЕЙ (1.0) =====
+-- ===== VERSION TAG (1.0) =====
 Window:Tag({
     Title = "v1.0",
     Icon = "code",
@@ -153,16 +169,16 @@ Window:Tag({
 })
 
 -- ============================================================
--- ВКЛАДКА ГЛАВНАЯ
+-- HOME TAB
 -- ============================================================
 local MainTab = Window:Tab({
-    Title = "Главная",
+    Title = "Home",
     Icon = "house",
     Border = true
 })
 
 MainTab:Button({
-    Title = "📌 Экзекьютор: " .. executorName,
+    Title = "📌 Executor: " .. executorName,
     Justify = "Center",
     Callback = function()
     end
@@ -178,17 +194,17 @@ MainTab:Button({
 })
 
 -- ============================================================
--- ВКЛАДКА ИГРОК
+-- PLAYER TAB
 -- ============================================================
 local PlayerTab = Window:Tab({
-    Title = "Игрок",
+    Title = "Player",
     Icon = "user",
     Border = true
 })
 
 PlayerTab:Toggle({
     Title = "Noclip",
-    Desc = "Проход сквозь стены",
+    Desc = "Walk through walls",
     Flag = "NoclipFlag",
     Value = false,
     Callback = function(state)
@@ -228,7 +244,7 @@ PlayerTab:Space()
 PlayerTab:Slider({
     Flag = "SpeedValueFlag",
     Title = "Speed Hack",
-    Desc = "Скорость передвижения",
+    Desc = "Movement speed",
     IsTooltip = true,
     Step = 1,
     Value = {
@@ -251,7 +267,7 @@ PlayerTab:Slider({
 PlayerTab:Space()
 
 PlayerTab:Toggle({
-    Title = "Включить Speed Hack",
+    Title = "Enable Speed Hack",
     Flag = "SpeedToggleFlag",
     Value = false,
     Callback = function(state)
@@ -273,7 +289,7 @@ PlayerTab:Space()
 
 PlayerTab:Toggle({
     Title = "Infinite Jump",
-    Desc = "Бесконечные прыжки",
+    Desc = "Unlimited jumps",
     Flag = "InfiniteJumpFlag",
     Value = false,
     Callback = function(state)
@@ -302,31 +318,57 @@ PlayerTab:Toggle({
 
 PlayerTab:Space()
 
+-- ============================================================
+-- INSTANT PROXIMITYPROMPTS (UPDATE EVERY 0.5 SEC)
+-- ============================================================
+function SetAllPromptsInstant()
+    for _, prompt in ipairs(workspace:GetDescendants()) do
+        if prompt:IsA("ProximityPrompt") then
+            prompt.HoldDuration = 0
+        end
+    end
+end
+
 PlayerTab:Toggle({
-    Title = "Моментальные ProximityPrompts",
-    Desc = "HoldDuration = 0",
+    Title = "Instant ProximityPrompts",
+    Desc = "HoldDuration = 0 (updates every 0.5 sec)",
     Flag = "InstantPromptsFlag",
     Value = false,
     Callback = function(state)
         instantPromptsEnabled = state
         if instantPromptsEnabled then
-            for _, prompt in ipairs(workspace:GetDescendants()) do
-                if prompt:IsA("ProximityPrompt") then
-                    prompt.HoldDuration = 0
-                end
+            SetAllPromptsInstant()
+            
+            if instantPromptLoopConnection then
+                instantPromptLoopConnection:Disconnect()
+                instantPromptLoopConnection = nil
             end
+            
+            instantPromptLoopConnection = runService.Heartbeat:Connect(function()
+                if instantPromptsEnabled then
+                    SetAllPromptsInstant()
+                end
+            end)
+            
             local conn = workspace.DescendantAdded:Connect(function(d)
                 if instantPromptsEnabled and d:IsA("ProximityPrompt") then
                     d.HoldDuration = 0
                 end
             end)
             table.insert(instantPromptConnections, conn)
+            
         else
+            if instantPromptLoopConnection then
+                instantPromptLoopConnection:Disconnect()
+                instantPromptLoopConnection = nil
+            end
+            
             for _, prompt in ipairs(workspace:GetDescendants()) do
                 if prompt:IsA("ProximityPrompt") then
                     prompt.HoldDuration = 1
                 end
             end
+            
             for _, conn in ipairs(instantPromptConnections) do
                 if conn then
                     conn:Disconnect()
@@ -338,17 +380,18 @@ PlayerTab:Toggle({
 })
 
 -- ============================================================
--- ВКЛАДКА АВТО
+-- AUTO TAB
 -- ============================================================
 local AutoTab = Window:Tab({
-    Title = "Авто",
+    Title = "Auto",
     Icon = "bot",
     Border = true
 })
 
+-- ---- AUTO DNA ----
 AutoTab:Toggle({
-    Title = "Авто взять DNA",
-    Desc = "Телепортирует к ProximityPrompt с действием 'Take DNA Sample' и нажимает E",
+    Title = "Auto Take DNA",
+    Desc = "Teleports to ProximityPrompt with 'Take DNA Sample' and presses E",
     Flag = "AutoDNAFlag",
     Value = false,
     Callback = function(state)
@@ -372,21 +415,37 @@ AutoTab:Toggle({
                     if obj:IsA("ProximityPrompt") and obj.Enabled then
                         local actionText = obj.ActionText or ""
                         local objectText = obj.ObjectText or ""
+                        local combinedText = (actionText .. " " .. objectText):upper()
                         
-                        local actionUpper = string.upper(actionText)
-                        local objectUpper = string.upper(objectText)
-                        
-                        -- Проверяем наличие "DNA" в любом тексте
-                        if string.find(objectUpper, "DNA") or 
-                           string.find(actionUpper, "DNA") or
-                           string.find(actionUpper, "TAKE DNA") then
+                        if string.find(combinedText, "TAKE DNA SAMPLE") or 
+                           string.find(combinedText, "TAKE DNA") or
+                           string.find(combinedText, "DNA SAMPLE") or
+                           string.find(combinedText, "DNA") then
                             
                             local parent = obj.Parent
-                            if parent and parent:IsA("BasePart") then
-                                local distance = (charPos - parent.Position).Magnitude
+                            local targetPart = nil
+                            if parent then
+                                if parent:IsA("BasePart") then
+                                    targetPart = parent
+                                elseif parent:IsA("Model") then
+                                    if parent.PrimaryPart then
+                                        targetPart = parent.PrimaryPart
+                                    else
+                                        for _, child in ipairs(parent:GetChildren()) do
+                                            if child:IsA("BasePart") then
+                                                targetPart = child
+                                                break
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                            
+                            if targetPart then
+                                local distance = (charPos - targetPart.Position).Magnitude
                                 table.insert(dnaPrompts, {
                                     Prompt = obj,
-                                    Part = parent,
+                                    Part = targetPart,
                                     Distance = distance
                                 })
                             end
@@ -432,8 +491,8 @@ AutoTab:Space()
 
 AutoTab:Slider({
     Flag = "AutoDNADelayFlag",
-    Title = "Задержка авто DNA",
-    Desc = "Время между действиями (сек)",
+    Title = "Auto DNA Delay",
+    Desc = "Time between actions (sec)",
     IsTooltip = true,
     Step = 0.1,
     Value = {
@@ -448,63 +507,224 @@ AutoTab:Slider({
 
 AutoTab:Space()
 
-AutoTab:Button({
-    Title = "📌 Телепорт к DNA",
-    Justify = "Center",
-    Callback = function()
-        if not character or not character.PrimaryPart then
-            return
-        end
-        
-        local charPos = character.PrimaryPart.Position
-        local closestPrompt = nil
-        local closestDistance = math.huge
-        
-        for _, obj in ipairs(workspace:GetDescendants()) do
-            if obj:IsA("ProximityPrompt") and obj.Enabled then
-                local actionText = obj.ActionText or ""
-                local objectText = obj.ObjectText or ""
+-- ---- AUTO COFFEE ----
+AutoTab:Toggle({
+    Title = "Auto Coffee",
+    Desc = "Teleports to 'Coffee: Ready' text and takes coffee",
+    Flag = "AutoCoffeeFlag",
+    Value = false,
+    Callback = function(state)
+        autoCoffeeEnabled = state
+        if autoCoffeeEnabled then
+            if autoCoffeeConnection then
+                autoCoffeeConnection:Disconnect()
+            end
+            autoCoffeeConnection = runService.Heartbeat:Connect(function()
+                if not autoCoffeeEnabled then
+                    return
+                end
+                if not character or not character.PrimaryPart then
+                    return
+                end
                 
-                local actionUpper = string.upper(actionText)
-                local objectUpper = string.upper(objectText)
+                local charPos = character.PrimaryPart.Position
+                local coffeeObjects = {}
                 
-                if string.find(objectUpper, "DNA") or 
-                   string.find(actionUpper, "DNA") or
-                   string.find(actionUpper, "TAKE DNA") then
-                    
-                    local parent = obj.Parent
-                    if parent and parent:IsA("BasePart") then
-                        local distance = (charPos - parent.Position).Magnitude
-                        if distance < closestDistance then
-                            closestDistance = distance
-                            closestPrompt = parent
+                for _, obj in ipairs(workspace:GetDescendants()) do
+                    if obj:IsA("TextLabel") or obj:IsA("TextButton") then
+                        local text = obj.Text or ""
+                        if string.find(string.upper(text), "COFFEE: READY") or 
+                           (string.find(string.upper(text), "READY") and string.find(string.upper(obj.Parent and obj.Parent.Name or ""), "COFFEE")) then
+                            local parent = obj.Parent
+                            local targetPart = nil
+                            
+                            if parent then
+                                if parent:IsA("BasePart") then
+                                    targetPart = parent
+                                elseif parent:IsA("Model") then
+                                    if parent.PrimaryPart then
+                                        targetPart = parent.PrimaryPart
+                                    else
+                                        for _, child in ipairs(parent:GetChildren()) do
+                                            if child:IsA("BasePart") then
+                                                targetPart = child
+                                                break
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                            
+                            if targetPart then
+                                local distance = (charPos - targetPart.Position).Magnitude
+                                table.insert(coffeeObjects, {
+                                    Part = targetPart,
+                                    Distance = distance
+                                })
+                            end
                         end
                     end
                 end
-            end
-        end
-        
-        if closestPrompt then
-            character:SetPrimaryPartCFrame(
-                CFrame.new(closestPrompt.Position + Vector3.new(0, 2, 0))
-            )
-            WindUI:Notify({
-                Title = "Авто DNA",
-                Content = "Телепорт к DNA!",
-                Duration = 2
-            })
+                
+                if #coffeeObjects > 0 then
+                    table.sort(coffeeObjects, function(a, b)
+                        return a.Distance < b.Distance
+                    end)
+                    
+                    local target = coffeeObjects[1]
+                    
+                    if target.Distance > 3 then
+                        character:SetPrimaryPartCFrame(
+                            CFrame.new(target.Part.Position + Vector3.new(0, 2, 0))
+                        )
+                        task.wait(0.05)
+                    end
+                    
+                    virtualInput:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                    task.wait(0.05)
+                    virtualInput:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                    
+                    task.wait(autoCoffeeDelay)
+                end
+            end)
         else
-            WindUI:Notify({
-                Title = "Авто DNA",
-                Content = "DNA не найдено!",
-                Duration = 2
-            })
+            if autoCoffeeConnection then
+                autoCoffeeConnection:Disconnect()
+                autoCoffeeConnection = nil
+            end
         end
     end
 })
 
+AutoTab:Space()
+
+AutoTab:Slider({
+    Flag = "AutoCoffeeDelayFlag",
+    Title = "Auto Coffee Delay",
+    Desc = "Time between actions (sec)",
+    IsTooltip = true,
+    Step = 0.1,
+    Value = {
+        Min = 0.1,
+        Max = 3,
+        Default = 0.5
+    },
+    Callback = function(value)
+        autoCoffeeDelay = value
+    end
+})
+
+AutoTab:Space()
+
+-- ---- AUTO TASER ----
+AutoTab:Toggle({
+    Title = "Auto Taser",
+    Desc = "Teleports to 'Taser: Ready' text and takes taser",
+    Flag = "AutoTaserFlag",
+    Value = false,
+    Callback = function(state)
+        autoTaserEnabled = state
+        if autoTaserEnabled then
+            if autoTaserConnection then
+                autoTaserConnection:Disconnect()
+            end
+            autoTaserConnection = runService.Heartbeat:Connect(function()
+                if not autoTaserEnabled then
+                    return
+                end
+                if not character or not character.PrimaryPart then
+                    return
+                end
+                
+                local charPos = character.PrimaryPart.Position
+                local taserObjects = {}
+                
+                for _, obj in ipairs(workspace:GetDescendants()) do
+                    if obj:IsA("TextLabel") or obj:IsA("TextButton") then
+                        local text = obj.Text or ""
+                        if string.find(string.upper(text), "TASER: READY") or 
+                           (string.find(string.upper(text), "READY") and string.find(string.upper(obj.Parent and obj.Parent.Name or ""), "TASER")) then
+                            local parent = obj.Parent
+                            local targetPart = nil
+                            
+                            if parent then
+                                if parent:IsA("BasePart") then
+                                    targetPart = parent
+                                elseif parent:IsA("Model") then
+                                    if parent.PrimaryPart then
+                                        targetPart = parent.PrimaryPart
+                                    else
+                                        for _, child in ipairs(parent:GetChildren()) do
+                                            if child:IsA("BasePart") then
+                                                targetPart = child
+                                                break
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                            
+                            if targetPart then
+                                local distance = (charPos - targetPart.Position).Magnitude
+                                table.insert(taserObjects, {
+                                    Part = targetPart,
+                                    Distance = distance
+                                })
+                            end
+                        end
+                    end
+                end
+                
+                if #taserObjects > 0 then
+                    table.sort(taserObjects, function(a, b)
+                        return a.Distance < b.Distance
+                    end)
+                    
+                    local target = taserObjects[1]
+                    
+                    if target.Distance > 3 then
+                        character:SetPrimaryPartCFrame(
+                            CFrame.new(target.Part.Position + Vector3.new(0, 2, 0))
+                        )
+                        task.wait(0.05)
+                    end
+                    
+                    virtualInput:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                    task.wait(0.05)
+                    virtualInput:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                    
+                    task.wait(autoTaserDelay)
+                end
+            end)
+        else
+            if autoTaserConnection then
+                autoTaserConnection:Disconnect()
+                autoTaserConnection = nil
+            end
+        end
+    end
+})
+
+AutoTab:Space()
+
+AutoTab:Slider({
+    Flag = "AutoTaserDelayFlag",
+    Title = "Auto Taser Delay",
+    Desc = "Time between actions (sec)",
+    IsTooltip = true,
+    Step = 0.1,
+    Value = {
+        Min = 0.1,
+        Max = 3,
+        Default = 0.5
+    },
+    Callback = function(value)
+        autoTaserDelay = value
+    end
+})
+
 -- ============================================================
--- ВКЛАДКА VISUALS
+-- VISUALS TAB
 -- ============================================================
 local VisualsTab = Window:Tab({
     Title = "Visuals",
@@ -512,9 +732,10 @@ local VisualsTab = Window:Tab({
     Border = true
 })
 
+-- ---- MAIN ESP ----
 VisualsTab:Toggle({
-    Title = "ESP для пациентов",
-    Desc = "Показывает имена моделей (маленький шрифт). Barney - коричневый ☕",
+    Title = "ESP for Patients",
+    Desc = "Shows model names. Barney - brown ☕",
     Flag = "EspFlag",
     Value = false,
     Callback = function(state)
@@ -527,19 +748,48 @@ VisualsTab:Toggle({
     end
 })
 
+VisualsTab:Space()
+
+-- ---- TRACERS ----
+VisualsTab:Toggle({
+    Title = "Tracers (lines to objects)",
+    Desc = "Draws lines from screen bottom to highlighted objects",
+    Flag = "TracersFlag",
+    Value = false,
+    Callback = function(state)
+        tracersEnabled = state
+        if tracersEnabled then
+            if tracersConnection then
+                tracersConnection:Disconnect()
+            end
+            tracersConnection = runService.RenderStepped:Connect(function()
+                if tracersEnabled then
+                    DrawTracers()
+                end
+            end)
+        else
+            if tracersConnection then
+                tracersConnection:Disconnect()
+                tracersConnection = nil
+            end
+            ClearTracers()
+        end
+    end
+})
+
 -- ============================================================
--- ВКЛАДКА НАСТРОЙКИ
+-- SETTINGS TAB
 -- ============================================================
 local SettingsTab = Window:Tab({
-    Title = "Настройки",
+    Title = "Settings",
     Icon = "settings",
     Border = true
 })
 
 SettingsTab:Slider({
     Flag = "TransparencyFlag",
-    Title = "Прозрачность GUI",
-    Desc = "Регулировка прозрачности окна",
+    Title = "GUI Transparency",
+    Desc = "Adjust window transparency",
     IsTooltip = true,
     Step = 0.05,
     Value = {
@@ -557,7 +807,7 @@ SettingsTab:Slider({
 })
 
 -- ============================================================
--- МОНИТОРИНГ НАДПИСИ "READY" (ВСЕГДА ВКЛЮЧЁН)
+-- MONITORING "READY" TEXT (Coffee: Ready, Taser: Ready)
 -- ============================================================
 task.spawn(function()
     while task.wait(1) do
@@ -566,24 +816,51 @@ task.spawn(function()
                 if obj:IsA("TextLabel") or obj:IsA("TextButton") then
                     local text = obj.Text or ""
                     local upperText = string.upper(text)
+                    local objId = tostring(obj)
                     
+                    -- Check if "READY" exists
                     if string.find(upperText, "READY") then
-                        local objId = tostring(obj)
+                        local parent = obj.Parent
+                        local parentName = ""
+                        if parent then
+                            parentName = parent.Name or ""
+                        end
                         
-                        if not readyNotified[objId] then
-                            readyNotified[objId] = true
-                            
-                            WindUI:Notify({
-                                Title = "☕ КОФЕ ГОТОВО!",
-                                Content = "Забери кофе, пока не остыл!",
-                                Duration = 5,
-                                Icon = "coffee"
-                            })
-                            
-                            print("[Mazami Hub] Кофе готов! Найдена надпись: " .. text)
-                            
-                            task.wait(30)
-                            readyNotified[objId] = nil
+                        local isCoffee = string.find(string.upper(parentName), "COFFEE") or 
+                                        string.find(string.upper(text), "COFFEE")
+                        local isTaser = string.find(string.upper(parentName), "TASER") or 
+                                       string.find(string.upper(text), "TASER")
+                        
+                        -- Coffee notification
+                        if isCoffee then
+                            if not readyNotified[objId] then
+                                readyNotified[objId] = true
+                                WindUI:Notify({
+                                    Title = "☕ COFFEE READY!",
+                                    Content = "Take the coffee before it gets cold!",
+                                    Duration = 5,
+                                    Icon = "coffee"
+                                })
+                                print("[Mazami Hub] Coffee: Ready! Found text: " .. text)
+                                task.wait(30)
+                                readyNotified[objId] = nil
+                            end
+                        end
+                        
+                        -- Taser notification
+                        if isTaser then
+                            if not taserNotified[objId] then
+                                taserNotified[objId] = true
+                                WindUI:Notify({
+                                    Title = "⚡ TASER READY!",
+                                    Content = "Taser is charged and ready to use!",
+                                    Duration = 5,
+                                    Icon = "bolt"
+                                })
+                                print("[Mazami Hub] Taser: Ready! Found text: " .. text)
+                                task.wait(30)
+                                taserNotified[objId] = nil
+                            end
                         end
                     end
                 end
@@ -593,7 +870,72 @@ task.spawn(function()
 end)
 
 -- ============================================================
--- ФУНКЦИИ ESP
+-- TRACERS FUNCTIONS
+-- ============================================================
+function DrawTracers()
+    local viewportSize = camera.ViewportSize
+    local screenBottom = Vector2.new(viewportSize.X / 2, viewportSize.Y)
+    
+    for _, model in ipairs(workspace:GetDescendants()) do
+        if model:IsA("Model") and model:FindFirstChild("Humanoid") and model ~= character then
+            local highlight = model:FindFirstChild("GammaESP")
+            if highlight then
+                local primaryPart = model.PrimaryPart or model:FindFirstChild("Head") or model:FindFirstChild("HumanoidRootPart")
+                if primaryPart then
+                    local pos, onScreen = camera:WorldToViewportPoint(primaryPart.Position)
+                    if onScreen then
+                        local screenPos = Vector2.new(pos.X, pos.Y)
+                        local color = highlight.FillColor
+                        
+                        local tracer = nil
+                        for _, obj in ipairs(tracersObjects) do
+                            if obj.Model == model then
+                                tracer = obj
+                                break
+                            end
+                        end
+                        
+                        if not tracer then
+                            tracer = {
+                                Model = model,
+                                Line = Drawing.new("Line")
+                            }
+                            tracer.Line.Color = color
+                            tracer.Line.Thickness = 1
+                            tracer.Line.Transparency = 1
+                            table.insert(tracersObjects, tracer)
+                        end
+                        
+                        tracer.Line.From = screenBottom
+                        tracer.Line.To = screenPos
+                        tracer.Line.Color = color
+                        tracer.Line.Visible = true
+                    end
+                end
+            end
+        end
+    end
+    
+    for i = #tracersObjects, 1, -1 do
+        local tracer = tracersObjects[i]
+        if not tracer.Model or not tracer.Model:FindFirstChild("GammaESP") or not tracer.Model.Parent then
+            tracer.Line.Visible = false
+            table.remove(tracersObjects, i)
+        end
+    end
+end
+
+function ClearTracers()
+    for _, tracer in ipairs(tracersObjects) do
+        if tracer.Line then
+            tracer.Line:Remove()
+        end
+    end
+    tracersObjects = {}
+end
+
+-- ============================================================
+-- ESP FUNCTIONS
 -- ============================================================
 function RemoveBuiltInHighlights(model)
     if not model then
@@ -723,7 +1065,7 @@ function CreateESP(model)
     
     if isBarney then
         color = Color3.fromRGB(139, 69, 19)
-        labelText = "☕ БАРНИ"  -- Убрал медведя
+        labelText = "☕ BARNEY"
     elseif isPlayer then
         color = Color3.fromRGB(255, 255, 255)
         labelText = model.Name or "Player"
@@ -848,14 +1190,14 @@ function DisableESP()
 end
 
 -- ============================================================
--- ЗАГРУЗКА
+-- LOAD
 -- ============================================================
 task.wait(0.5)
 
 WindUI:Notify({
     Title = "Mazami Hub",
-    Content = "Animal Hospital загружен! Синяя тема 💙",
+    Content = "Animal Hospital loaded! Blue theme 💙",
     Duration = 4
 })
 
-print("Mazami Hub запущен! Исполнитель: " .. executorName)
+print("Mazami Hub started! Executor: " .. executorName)
